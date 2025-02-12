@@ -23,6 +23,9 @@ class RSIFeature(BaseFeature):
         self.period = config.lookback_period_rsi
         self.oversold = config.rsi_oversold
         self.overbought = config.rsi_overbought
+    
+    def get_names(self) -> List[str]:
+        return ['RSI', 'RSI_signal']
 
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         delta = df['close'].diff()
@@ -39,6 +42,9 @@ class EMAFeature(BaseFeature):
         self.short_period = config.ema_short
         self.long_period = config.ema_long
 
+    def get_names(self) -> List[str]:
+        return ['EMA_short', 'EMA_long', 'EMA_signal']
+
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         df['EMA_short'] = df['close'].ewm(span=self.short_period).mean()
         df['EMA_long'] = df['close'].ewm(span=self.long_period).mean()
@@ -53,6 +59,9 @@ class ReturnFeatures(BaseFeature):
             '6h': 12,    # 12 periods of 30min
         }
 
+    def get_names(self) -> List[str]:
+        return [f'return_{name}' for name in self.periods.keys()]
+
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         for name, period in self.periods.items():
             df[f'return_{name}'] = df['close'].pct_change(periods=period)
@@ -62,6 +71,9 @@ class VolatilityFeatures(BaseFeature):
     def __init__(self):
         self.windows = [2, 6, 12, 24, 48]  # 1h, 3h, 6h, 12h, 24h in 30min periods
 
+    def get_names(self) -> List[str]:
+        return [f'volatility_{window}' for window in self.windows]
+
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         for window in self.windows:
             df[f'volatility_{window}'] = df['close'].pct_change().rolling(window=window).std()
@@ -70,6 +82,9 @@ class VolatilityFeatures(BaseFeature):
 class VolumeFeatures(BaseFeature):
     def __init__(self):
         self.windows = [2, 6, 12, 24, 48]  # 1h, 3h, 6h, 12h, 24h in 30min periods
+
+    def get_names(self) -> List[str]:
+        return [f'volume_ma_{window}' for window in self.windows] + ['volume_rel_ma24']
 
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         # Volume moving averages
@@ -83,6 +98,9 @@ class VolumeFeatures(BaseFeature):
 class PriceMAFeatures(BaseFeature):
     def __init__(self):
         self.windows = [2, 6, 12, 24, 48, 96]  #  1h, 3h, 6h, 12h, 24h, 48h in 30min periods
+    
+    def get_names(self) -> List[str]:
+        return [f'price_ma_{window}' for window in self.windows] + [f'price_rel_ma_{window}' for window in self.windows]
 
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         for window in self.windows:
@@ -93,6 +111,9 @@ class PriceMAFeatures(BaseFeature):
 class MomentumFeatures(BaseFeature):
     def __init__(self):
         self.windows = [2, 6, 12, 24, 48]  #  1h, 3h, 6h, 12h, 24h in 30min periods
+    
+    def get_names(self) -> List[str]:
+        return [f'momentum_{window}' for window in self.windows] + ['macd', 'macd_signal']
 
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         # ROC (Rate of Change)
@@ -110,6 +131,9 @@ class BollingerBandsFeature(BaseFeature):
     def __init__(self, config: SignalConfig):
         self.period = config.lookback_period_bollinger
         self.std_dev = 2
+    
+    def get_names(self) -> List[str]:
+        return ['BB_middle', 'BB_upper', 'BB_lower', 'BB_signal']
 
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         df['BB_middle'] = df['close'].rolling(window=self.period).mean()
@@ -134,6 +158,12 @@ class SignalGenerator:
             df = feature.calculate(df)
         return df
     
+    def get_all_feature_names(self):
+        all_feature_names = []
+        for feature in self.features:
+            all_feature_names.extend(feature.get_names())
+        return all_feature_names
+        
     def generate_combined_signal(self, df: pd.DataFrame) -> pd.DataFrame:
         signal_columns = [col for col in df.columns if col.endswith('_signal')]
         df['combined_signal'] = df[signal_columns].mean(axis=1)
