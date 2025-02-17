@@ -1,0 +1,170 @@
+from typing import List, Dict, Any
+import pandas as pd
+import numpy as np
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
+
+@dataclass
+class Config:
+    lookback_period_rsi: int = 14
+    lookback_period_bollinger: int = 20
+    rsi_oversold: float = 30
+    rsi_overbought: float = 70
+    ema_short: int = 9
+    ema_long: int = 21
+
+class BaseFeature(ABC): 
+    @abstractmethod
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        pass
+
+class RSIFeature(BaseFeature):
+    def __init__(self, config: Config):
+        self.period = config.lookback_period_rsi
+        self.oversold = config.rsi_oversold
+        self.overbought = config.rsi_overbought
+    
+    def get_names(self) -> List[str]:
+        return ['RSI', 'RSI_feature']
+
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=self.period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=self.period).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+        df['RSI_feature'] = np.where(df['RSI'] < self.oversold, 1, 
+                                   np.where(df['RSI'] > self.overbought, -1, 0))
+        return df
+
+class EMAFeature(BaseFeature):
+    def __init__(self, config: Config):
+        self.short_period = config.ema_short
+        self.long_period = config.ema_long
+
+    def get_names(self) -> List[str]:
+        return ['EMA_short', 'EMA_long', 'EMA_feature']
+
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        df['EMA_short'] = df['close'].ewm(span=self.short_period).mean()
+        df['EMA_long'] = df['close'].ewm(span=self.long_period).mean()
+        df['EMA_feature'] = np.where(df['EMA_short'] > df['EMA_long'], 1, -1)
+        return df
+    
+class ReturnFeatures(BaseFeature):
+    def __init__(self):
+        self.periods = {
+            '30m': 1,    # 1 period of 30min
+            '1h': 2,     # 2 periods of 30min
+            '6h': 12,    # 12 periods of 30min
+        }
+
+    def get_names(self) -> List[str]:
+        return [f'return_{name}' for name in self.periods.keys()]
+
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        for name, period in self.periods.items():
+            df[f'return_{name}'] = df['close'].pct_change(periods=period)
+        return df
+
+class VolatilityFeatures(BaseFeature):
+    def __init__(self):
+        self.windows = [2, 6, 12, 24, 48]  # 1h, 3h, 6h, 12h, 24h in 30min periods
+
+    def get_names(self) -> List[str]:
+        return [f'volatility_{window}' for window in self.windows]
+
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        for window in self.windows:
+            df[f'volatility_{window}'] = df['close'].pct_change().rolling(window=window).std()
+        return df
+
+class VolumeFeatures(BaseFeature):
+    def __init__(self):
+        self.windows = [2, 6, 12, 24, 48]  # 1h, 3h, 6h, 12h, 24h in 30min periods
+
+    def get_names(self) -> List[str]:
+        return [f'volume_ma_{window}' for window in self.windows] + ['volume_rel_ma24']
+
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        # Volume moving averages
+        for window in self.windows:
+            df[f'volume_ma_{window}'] = df['volume'].rolling(window=window).mean()
+        
+        # Volume relative to moving average
+        df['volume_rel_ma24'] = df['volume'] / df['volume_ma_24']
+        return df
+
+class PriceMAFeatures(BaseFeature):
+    def __init__(self):
+        self.windows = [2, 6, 12, 24, 48, 96]  #  1h, 3h, 6h, 12h, 24h, 48h in 30min periods
+    
+    def get_names(self) -> List[str]:
+        return [f'price_ma_{window}' for window in self.windows] + [f'price_rel_ma_{window}' for window in self.windows]
+
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        for window in self.windows:
+            df[f'price_ma_{window}'] = df['close'].rolling(window=window).mean()
+            df[f'price_rel_ma_{window}'] = df['close'] / df[f'price_ma_{window}'] - 1
+        return df
+
+class MomentumFeatures(BaseFeature):
+    def __init__(self):
+        self.windows = [2, 6, 12, 24, 48]  #  1h, 3h, 6h, 12h, 24h in 30min periods
+    
+    def get_names(self) -> List[str]:
+        return [f'momentum_{window}' for window in self.windows] + ['macd', 'macd_feature']
+
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        # ROC (Rate of Change)
+        for window in self.windows:
+            df[f'momentum_{window}'] = df['close'].pct_change(periods=window)
+        
+        # MACD
+        df['ema_12'] = df['close'].ewm(span=12).mean()
+        df['ema_26'] = df['close'].ewm(span=26).mean()
+        df['macd'] = df['ema_12'] - df['ema_26']
+        df['macd_feature'] = df['macd'].ewm(span=9).mean()
+        return df
+
+class BollingerBandsFeature(BaseFeature):
+    def __init__(self, config: Config):
+        self.period = config.lookback_period_bollinger
+        self.std_dev = 2
+    
+    def get_names(self) -> List[str]:
+        return ['BB_middle', 'BB_upper', 'BB_lower', 'BB_feature']
+
+    def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
+        df['BB_middle'] = df['close'].rolling(window=self.period).mean()
+        df['BB_std'] = df['close'].rolling(window=self.period).std()
+        df['BB_upper'] = df['BB_middle'] + (df['BB_std'] * self.std_dev)
+        df['BB_lower'] = df['BB_middle'] - (df['BB_std'] * self.std_dev)
+        df['BB_feature'] = np.where(df['close'] < df['BB_lower'], 1,
+                                  np.where(df['close'] > df['BB_upper'], -1, 0))
+        return df
+
+
+class Generator:
+    def __init__(self, config: Config = Config()):
+        self.config = config
+        self.features: List[BaseFeature] = []
+        
+    def add_feature(self, feature: BaseFeature) -> None:
+        self.features.append(feature)
+        
+    def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        for feature in self.features:
+            df = feature.calculate(df)
+        return df
+    
+    def get_all_feature_names(self):
+        all_feature_names = []
+        for feature in self.features:
+            all_feature_names.extend(feature.get_names())
+        return all_feature_names
+        
+    def generate_combined_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        feature_columns = [col for col in df.columns if col.endswith('_feature')]
+        df['combined_feature'] = df[feature_columns].mean(axis=1)
+        return df
