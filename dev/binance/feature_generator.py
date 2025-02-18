@@ -145,7 +145,7 @@ class BollingerBandsFeature(BaseFeature):
         return df
 
 
-class Generator:
+class FeatureGenerator:
     def __init__(self, config: Config = Config()):
         self.config = config
         self.features: List[BaseFeature] = []
