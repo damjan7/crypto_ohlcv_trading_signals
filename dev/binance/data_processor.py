@@ -20,6 +20,23 @@ def create_feature_dataset(df: pd.DataFrame) -> pd.DataFrame:
     # Initialize
     config = fg.Config()
     generator = fg.FeatureGenerator(config)
+
+    class_names = [
+    "RSIFeature",
+    "EMAFeature",
+    "ReturnFeatures",
+    "VolatilityFeatures",
+    "VolumeFeatures",
+    "PriceMAFeatures",
+    "MomentumFeatures",
+    "BollingerBandsFeature",
+    "ATRFeature",
+    "LogReturnFeature",
+    "StochasticOscillatorFeature",
+    "OBVFeature",
+    "VolumeZScoreFeature",
+    "FeatureGenerator"
+]
     
     # Add all features
     # manual so far, but no big deal
@@ -30,6 +47,12 @@ def create_feature_dataset(df: pd.DataFrame) -> pd.DataFrame:
     generator.add_feature(fg.RSIFeature(config))
     generator.add_feature(fg.EMAFeature(config))
     generator.add_feature(fg.BollingerBandsFeature(config))
+    generator.add_feature(fg.ATRFeature(config))
+    generator.add_feature(fg.LogReturnFeature())
+    generator.add_feature(fg.StochasticOscillatorFeature(config))
+    generator.add_feature(fg.OBVFeature())
+    generator.add_feature(fg.VolumeZScoreFeature())
+
 
     for feature in generator.features:
         feature_df = feature.calculate(df)
@@ -101,20 +124,68 @@ def create_cross_sectional_ds(dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 class DataClass():
     """
     Data Class that holds all the data that is then used in the signal generator
+    Contains:
+        - a dictionary for the features for each pair and the corresponding feature names
+        - a dictionary for the targets for each pair and the corresp. target names
+    
 
     TODO:
     - implement the above funcs in the class structure? or not?
+    - check if for(normalized) features; larger = better (needs to be consistent for features ofcourse)
     """
     def __init__(self, pairs: List[str], input_path: str):
+        self.pairs = pairs
         self.feature_dict, self.feature_names = create_feature_ds_dict_for_pairs(pairs=pairs, input_path=input_path)
         self.target_dict, self.target_names = create_target_datasets_for_pairs(pairs=pairs, input_path=input_path)
+        # todo: update the data processing function, as we have duplicate dates, below is quick fix
+        for pair in self.pairs:
+            self.feature_dict[pair] = self.feature_dict[pair].loc[~self.feature_dict[pair].index.duplicated(keep='first')]
+            self.target_dict[pair] = self.target_dict[pair].loc[~self.target_dict[pair].index.duplicated(keep='first')]
+
+        print("Succesfully Instantiated Data Class!")
 
     def get_feature_names(self):
         return self.feature_names
 
+    def get_target_names(self):
+        return self.target_names
+
     def summarize_data(self):
         pass
 
-    def normalize_features(self, feature_names: List[str]):
-        pass
+    def normalize_cross_sectional_features(self):
+        """
+        Normalizes cross sectional features
+        As a result, can easily combine the features via averaging 
+        """
+        if not self.cross_sectional_feat_dict: #exists ### how can i check this:
+            pass #throw an error
+        else:
+            pass #normalize
+
+    def create_cross_sectional_feature_matrix_dictionary(self, feat_names: List[str] = None):
+        """
+        Given a feature dictionary (keys=pairs, values=feature matrix), 
+        creates a dictionary of feature matrices (keys=feature_names, values=cross_sect_feature_matrix)
+        If no feature names are supplied, take all features
+        TODO:
+        - maybe add features such as the RSI signals that are binary w/o modifying..
+        """
+        if feat_names is None:
+            feat_names = self.feature_names
+
+        cross_sectional_feat_dict = {}
+        for feat_name in feat_names:
+            tmp = [v.loc[:, feat_name] for v in self.feature_dict.values()]
+            tmp = pd.concat(tmp, axis=1, join='outer')
+            tmp.columns = self.pairs
+            #tmp.index = v.index
+            cross_sectional_feat_dict[feat_name] = tmp
+        
+        self.cross_sectional_feat_dict = cross_sectional_feat_dict
+
+    
+        
+
+
 

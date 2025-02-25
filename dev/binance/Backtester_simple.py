@@ -5,7 +5,7 @@ import queue
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 
-from signal_generator import SignalGenerator, SignalConfig
+from feature_generator import FeatureGenerator
 from base_trainer import ModelTrainer, get_model, create_pipeline
 from data_processor import create_feature_dataset, create_target_dataset
 
@@ -40,7 +40,7 @@ TODO:
 """
 
 
-class CryptoBacktester:
+class Backtester:
     def __init__(
         self, 
         data: pd.DataFrame, 

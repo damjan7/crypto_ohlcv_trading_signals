@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 @dataclass
 class Config:
     """
-    Configuration for technical indicator calculations.
+    Configuration for (technical) feature calculations.
     
     Attributes:
         lookback_period_rsi (int): Number of periods for RSI calculation.
@@ -327,3 +327,30 @@ class VolumeZScoreFeature(BaseFeature):
 #    - OBV: A cumulative measure that varies greatly with absolute trading volume.
 #
 # For cross-asset analysis, focus on the normalized or percentage-based indicators to ensure meaningful comparisons.
+
+
+# Feature Generator Class
+class FeatureGenerator:
+
+
+    def __init__(self, config: Config = Config()):
+        self.config = config
+        self.features: List[BaseFeature] = []
+
+    def add_feature(self, feature: BaseFeature) -> None:
+        self.features.append(feature)
+
+    def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        for feature in self.features:
+            df = feature.calculate(df)
+        return df
+
+    def get_all_feature_names(self):
+        all_feature_names = []
+        for feature in self.features:
+            all_feature_names.extend(feature.get_names())
+        return all_feature_names
+
+
+
+
