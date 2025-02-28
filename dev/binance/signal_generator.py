@@ -82,6 +82,22 @@ class SignalClass(ABC):
             pd.DataFrame: Portfolio weights
         """
         pass
+
+    def inspect_feature_dict(feature_dict: Dict[str, pd.DataFrame]) -> None:
+    """
+    Print/log information about the feature dictionary.
+    For example:
+      - The earliest and latest timestamp per feature
+      - The frequency or time deltas
+      - The pairs (columns) each feature contains
+    """
+    for name, df in feature_dict.items():
+        print(f"--- Feature: {name} ---")
+        print(f"  Start: {df.index.min()}, End: {df.index.max()}")
+        print(f"  Columns (pairs): {df.columns.tolist()}")
+        # You could also calculate frequency heuristics, e.g. median time delta, etc.
+        print()
+
     
     def generate_signal(self, feature_dict: Dict[str, pd.DataFrame], 
                        start_date: datetime.datetime, 
@@ -99,6 +115,9 @@ class SignalClass(ABC):
         Returns:
             Dict[str, pd.DataFrame]: Dictionary of signal matrices
         """
+        # inspect feature dict
+        self.inspect_feature_dict(feature_dict)
+                           
         # Validate features
         self.validate_features(feature_dict)
         
