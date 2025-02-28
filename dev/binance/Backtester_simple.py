@@ -43,8 +43,8 @@ TODO:
 class Backtester:
     def __init__(
         self, 
-        data: pd.DataFrame, 
-        signals: pd.Series, 
+        data_dict: Dict[str, pd.DataFrame], 
+        weights: pd.DataFrame,
         initial_balance: float = 10000, 
         trading_fee: float = 0.001, 
         leverage: float = 1,
@@ -52,31 +52,39 @@ class Backtester:
         end_date: datetime.datetime = None
         ):
         """
-        data: DataFrame with 'Close' prices.
-        signals: Series with trading signals (-1, 0, 1), is calculated by the signal generator (needs to be implemented).
+        close_prices: Dict[str, pd.DataFrame] with 'Close' prices.
+        weights: DataFrame with weights for each asset.
         initial_balance: Starting capital.
         trading_fee: Trading cost per transaction.
         leverage: Maximum leverage allowed.
         """
-        self.data = data
-        self.signals = signals
+        self.data_dict = data_dict  # mat of the close prices of all pairs 
+        self.weights = weights
         self.initial_balance = initial_balance
         self.trading_fee = trading_fee
         self.leverage = leverage
         self.results = None
+
+        # match indices of close_prices and weights if not already aligned
+        if self.data_dict['close'].index.equals(self.weights.index):
+            print("Indices of close_prices and weights already aligned.")
+        else:
+            print("Indices of close_prices and weights not aligned. Aligning...")
+            self.data_dict['close'] = self.data_dict['close'].reindex(self.weights.index)
     
     def run_backtest(self):
-        df = self.data.copy()
-        df['Signal'] = self.signals
-        df['Returns'] = df['Close'].pct_change()
-        df['Strategy Returns'] = df['Returns'] * df['Signal'].shift(1) * self.leverage
+        df = self.data_dict
+        df['returns'] = df['close'].pct_change()
+        
+        # Calculate strategy returns based on weights
+        df['strategy returns'] = (df['returns'] * self.weights.shift(1)).sum(axis=1) * self.leverage
         
         # Account for trading costs
-        df['Trades'] = df['Signal'].diff().abs()  # A trade occurs when the signal changes
-        df['Strategy Returns'] -= df['Trades'] * self.trading_fee
+        df['trades'] = self.weights.diff().abs().sum(axis=1)  # A trade occurs when weights change
+        df['strategy returns'] -= df['trades'] * self.trading_fee
         
         # Compute equity curve
-        df['Equity'] = (1 + df['Strategy Returns']).cumprod() * self.initial_balance
+        df['equity'] = (1 + df['strategy returns']).cumprod() * self.initial_balance
         
         self.results = df
         return df
@@ -87,11 +95,11 @@ class Backtester:
             return None
         
         df = self.results.copy()
-        total_return = df['Equity'].iloc[-1] / self.initial_balance - 1
+        total_return = df['equity'].iloc[-1] / self.initial_balance - 1
         annualized_return = (1 + total_return) ** (252 / len(df)) - 1  # Assuming daily data
-        volatility = df['Strategy Returns'].std() * np.sqrt(252)
+        volatility = df['strategy returns'].std() * np.sqrt(252)
         sharpe_ratio = annualized_return / volatility if volatility != 0 else np.nan
-        max_drawdown = ((df['Equity'].cummax() - df['Equity']) / df['Equity'].cummax()).max()
+        max_drawdown = ((df['equity'].cummax() - df['equity']) / df['equity'].cummax()).max()
         
         return {
             "Total Return": total_return,
@@ -107,10 +115,10 @@ class Backtester:
             return
         
         plt.figure(figsize=(12, 6))
-        plt.plot(self.results['Equity'], label='Equity Curve', color='blue')
+        plt.plot(self.results['equity'], label='equity Curve', color='blue')
         plt.title('Backtest Performance')
         plt.xlabel('Time')
-        plt.ylabel('Equity ($)')
+        plt.ylabel('equity ($)')
         plt.legend()
         plt.show()
 
@@ -119,12 +127,11 @@ if __name__ == "__main__":
     np.random.seed(42)
     dates = pd.date_range(start='2023-01-01', periods=365, freq='D')
     prices = np.cumprod(1 + np.random.randn(365) * 0.01) * 1000  # Simulated price data
-    signals = np.random.choice([-1, 0, 1], size=365, p=[0.3, 0.4, 0.3])  # Random long/short signals
+    weights = pd.DataFrame({'Weight': np.random.rand(365)})  # Random weights
     
     data = pd.DataFrame({'Close': prices}, index=dates)
-    signal_df = pd.Series(signals, index=dates)
     
-    backtester = CryptoBacktester(data, signal_df)
+    backtester = Backtester(data, weights)
     backtester.run_backtest()
     metrics = backtester.performance_metrics()
     print(metrics)
