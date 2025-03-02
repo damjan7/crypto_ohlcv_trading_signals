@@ -146,10 +146,10 @@ class VolumeFeatures(BaseFeature):
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         # Compute moving averages for volume over different windows
         for window in self.windows:
-            df[f'volume_ma_{window}'] = df['volume'].rolling(window=window).mean()
+            df[f'volume_ma_{window}'] = df['usd_volume'].rolling(window=window).mean()
         
-        # Normalize the current volume using the 24-period moving average for better cross-asset comparison
-        df['volume_rel_ma24'] = df['volume'] / df['volume_ma_24']
+        # Normalize the current usd_volume using the 24-period moving average for better cross-asset comparison
+        df['volume_rel_ma24'] = df['usd_volume'] / df['volume_ma_24']
         return df
 
 class PriceMAFeatures(BaseFeature):
@@ -172,6 +172,8 @@ class PriceMAFeatures(BaseFeature):
             df[f'price_ma_{window}'] = df['close'].rolling(window=window).mean()
             df[f'price_rel_ma_{window}'] = df['close'] / df[f'price_ma_{window}'] - 1
         return df
+
+    
 
 class MomentumFeatures(BaseFeature):
     """
@@ -289,7 +291,7 @@ class OBVFeature(BaseFeature):
 
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
         df['direction'] = np.where(df['close'].diff() >= 0, 1, -1)
-        df['OBV'] = (df['volume'] * df['direction']).cumsum()
+        df['OBV'] = (df['usd_volume'] * df['direction']).cumsum()
         df.drop(columns=['direction'], inplace=True)
         return df
 
@@ -305,9 +307,9 @@ class VolumeZScoreFeature(BaseFeature):
         return [f'volume_zscore_{self.window}']
 
     def calculate(self, df: pd.DataFrame) -> pd.DataFrame:
-        vol_mean = df['volume'].rolling(window=self.window).mean()
-        vol_std = df['volume'].rolling(window=self.window).std()
-        df[f'volume_zscore_{self.window}'] = (df['volume'] - vol_mean) / vol_std
+        vol_mean = df['usd_volume'].rolling(window=self.window).mean()
+        vol_std = df['usd_volume'].rolling(window=self.window).std()
+        df[f'volume_zscore_{self.window}'] = (df['usd_volume'] - vol_mean) / vol_std
         return df
 
 # ===========================================================

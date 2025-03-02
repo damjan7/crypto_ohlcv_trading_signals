@@ -60,6 +60,8 @@ def create_feature_dataset(df: pd.DataFrame) -> pd.DataFrame:
     feature_names = generator.get_all_feature_names()
     feature_df.index = feature_df.Date
     feature_df.drop(["Date"], axis=1, inplace=True)
+    feature_df['close'] = df['close']
+    feature_names.append('close')
     return feature_df, feature_names
 
 def create_target_dataset(

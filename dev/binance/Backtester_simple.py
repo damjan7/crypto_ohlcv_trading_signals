@@ -46,7 +46,7 @@ class Backtester:
         data_dict: Dict[str, pd.DataFrame], 
         weights: pd.DataFrame,
         initial_balance: float = 10000, 
-        trading_fee: float = 0.001, 
+        trading_fee: float = 0.0, # 0.001
         leverage: float = 1,
         start_date: datetime.datetime = None,
         end_date: datetime.datetime = None
@@ -79,8 +79,22 @@ class Backtester:
         # Calculate strategy returns based on weights
         df['strategy returns'] = (df['returns'] * self.weights.shift(1)).sum(axis=1) * self.leverage
         
-        # Account for trading costs
-        df['trades'] = self.weights.diff().abs().sum(axis=1)  # A trade occurs when weights change
+        # Calculate actual portfolio weights after market movements (before rebalancing)
+        drifted_weights = pd.DataFrame(index=self.weights.index, columns=self.weights.columns)
+        
+        for t in range(1, len(self.weights)):
+            prev_weights = self.weights.iloc[t-1]
+            asset_returns = df['returns'].iloc[t]
+            
+            # Calculate how weights drift due to asset performance
+            portfolio_return = (prev_weights * asset_returns).sum()
+            drifted_weights.iloc[t] = prev_weights * (1 + asset_returns) / (1 + portfolio_return)
+        
+        # True turnover: difference between target weights and drifted weights
+        df['turnover'] = (self.weights - drifted_weights).abs().sum(axis=1)
+        
+        # Account for trading costs (based on actual turnover)
+        df['trades'] = df['turnover']
         df['strategy returns'] -= df['trades'] * self.trading_fee
         
         # Compute equity curve
@@ -100,13 +114,17 @@ class Backtester:
         volatility = df['strategy returns'].std() * np.sqrt(252)
         sharpe_ratio = annualized_return / volatility if volatility != 0 else np.nan
         max_drawdown = ((df['equity'].cummax() - df['equity']) / df['equity'].cummax()).max()
+        avg_turnover = df['turnover'].mean()
+        annualized_turnover = avg_turnover * 252  # Assuming daily data
         
         return {
             "Total Return": total_return,
             "Annualized Return": annualized_return,
             "Volatility": volatility,
             "Sharpe Ratio": sharpe_ratio,
-            "Max Drawdown": max_drawdown
+            "Max Drawdown": max_drawdown,
+            "Average Daily Turnover": avg_turnover,
+            "Annualized Turnover": annualized_turnover
         }
     
     def plot_results(self):
