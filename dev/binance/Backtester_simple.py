@@ -109,13 +109,36 @@ class Backtester:
             return None
         
         df = self.results.copy()
+        
+        # Infer data frequency and calculate annualization factor
+        if len(df['returns'].index) > 1:
+            # Calculate median time delta between consecutive timestamps
+            time_deltas = pd.Series(df['returns'].index[1:]) - pd.Series(df['returns'].index[:-1])
+            median_delta = time_deltas.median()
+            
+            # Determine annualization factor based on frequency
+            if median_delta <= pd.Timedelta(minutes=60):  # Hourly or less
+                minutes_per_bar = median_delta.total_seconds() / 60
+                annualization_factor = (60 * 24 * 365) / minutes_per_bar
+            elif median_delta <= pd.Timedelta(days=1):  # Daily
+                annualization_factor = 252
+            elif median_delta <= pd.Timedelta(days=7):  # Weekly
+                annualization_factor = 52
+            elif median_delta <= pd.Timedelta(days=31):  # Monthly
+                annualization_factor = 12
+            else:  # Quarterly or less frequent
+                annualization_factor = 4
+        else:
+            # Default to daily if we can't infer
+            annualization_factor = 252
+            
         total_return = df['equity'].iloc[-1] / self.initial_balance - 1
-        annualized_return = (1 + total_return) ** (252 / len(df)) - 1  # Assuming daily data
-        volatility = df['strategy returns'].std() * np.sqrt(252)
+        annualized_return = (1 + total_return) ** (annualization_factor / len(df)) - 1
+        volatility = df['strategy returns'].std() * np.sqrt(annualization_factor)
         sharpe_ratio = annualized_return / volatility if volatility != 0 else np.nan
         max_drawdown = ((df['equity'].cummax() - df['equity']) / df['equity'].cummax()).max()
         avg_turnover = df['turnover'].mean()
-        annualized_turnover = avg_turnover * 252  # Assuming daily data
+        annualized_turnover = avg_turnover * annualization_factor
         
         return {
             "Total Return": total_return,
