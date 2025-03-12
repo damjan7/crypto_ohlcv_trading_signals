@@ -99,9 +99,14 @@ def create_target_datasets_for_pairs(
     input_path: str
 ) -> Tuple[Dict[str, pd.DataFrame], List[str]]:
     out_dict = {}
+    target_names = []
     for pair in pairs:
-        df = pl.read_parquet(f'{input_path}/{pair.replace("/", "")}.parquet').to_pandas()
-        out_dict[pair], target_names = create_target_dataset(df)
+        try:    
+            df = pl.read_parquet(f'{input_path}/{pair.replace("/", "")}.parquet').to_pandas()
+            out_dict[pair], target_names = create_target_dataset(df)
+        except FileNotFoundError:
+            print(f"File not found for {pair}")
+            continue
     return out_dict, target_names
 
 def create_feature_ds_dict_for_pairs(
@@ -109,10 +114,16 @@ def create_feature_ds_dict_for_pairs(
     input_path: str
 ) -> Tuple[Dict[str, pd.DataFrame], List[str]]:
     out_dict = {}
+    new_pairs = []
     for pair in pairs:
-        df = pl.read_parquet(f'{input_path}/{pair.replace("/", "")}.parquet').to_pandas()
-        out_dict[pair], feat_names = create_feature_dataset(df)
-    return out_dict, feat_names
+        try:
+            df = pl.read_parquet(f'{input_path}/{pair.replace("/", "")}.parquet').to_pandas()
+            out_dict[pair], feat_names = create_feature_dataset(df)
+            new_pairs.append(pair)
+        except FileNotFoundError:
+            print(f"File not found for {pair}")
+            continue
+    return out_dict, feat_names, new_pairs
 
 
 def create_cross_sectional_ds(dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -137,9 +148,13 @@ class DataClass():
     """
     def __init__(self, pairs: List[str], input_path: str):
         self.pairs = pairs
-        self.feature_dict, self.feature_names = create_feature_ds_dict_for_pairs(pairs=pairs, input_path=input_path)
+        self.feature_dict, self.feature_names, new_pairs = create_feature_ds_dict_for_pairs(pairs=pairs, input_path=input_path)
         self.target_dict, self.target_names = create_target_datasets_for_pairs(pairs=pairs, input_path=input_path)
         # todo: update the data processing function, as we have duplicate dates, below is quick fix
+
+        self.pairs = new_pairs
+
+        # quick fix!!!! Should change data loading s.t. it's not overlapping anymore!
         for pair in self.pairs:
             self.feature_dict[pair] = self.feature_dict[pair].loc[~self.feature_dict[pair].index.duplicated(keep='first')]
             self.target_dict[pair] = self.target_dict[pair].loc[~self.target_dict[pair].index.duplicated(keep='first')]
@@ -181,7 +196,6 @@ class DataClass():
             tmp = [v.loc[:, feat_name] for v in self.feature_dict.values()]
             tmp = pd.concat(tmp, axis=1, join='outer')
             tmp.columns = self.pairs
-            #tmp.index = v.index
             cross_sectional_feat_dict[feat_name] = tmp
         
         self.cross_sectional_feat_dict = cross_sectional_feat_dict
