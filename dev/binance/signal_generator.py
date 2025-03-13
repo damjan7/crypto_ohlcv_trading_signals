@@ -341,44 +341,40 @@ class SimpleSortingLongOnly(SignalClass):
         Calculate the weights for the signal.
         Returns weights for all Quintile Portfolios.
         """
+        # Initialize dictionary to store quintile weights
         quintile_weights = {}
         for quintile in range(self.num_quantiles):
             quintile_name = f"quintile_{quintile+1}"
             quintile_weights[quintile_name] = pd.DataFrame(0, index=processed_features.index, columns=processed_features.columns)
-
-        for date_idx, date in enumerate(processed_features.index):
-            # Get the number of valid assets for the current date
-            num_valid_assets = processed_features.shape[1] - processed_features.isna().sum(axis=1)[date_idx]
+        
+        # Calculate ranks for all dates at once
+        all_ranks = processed_features.rank(axis=1, method="first", pct=True)
+        
+        # Define quintile breakpoints (0.0-0.2, 0.2-0.4, etc.)
+        breakpoints = [i/self.num_quantiles for i in range(self.num_quantiles+1)]
+        
+        # Process all quintiles at once
+        for quintile in range(self.num_quantiles):
+            quintile_name = f"quintile_{quintile+1}"
             
-            # Calculate the base number of constituents per quintile
-            base_constituents_per_quintile = num_valid_assets // self.num_quantiles
+            # Create mask for this quintile (e.g., ranks between 0.0-0.2 for quintile 1)
+            lower_bound = breakpoints[quintile]
+            upper_bound = breakpoints[quintile+1]
             
-            # Calculate the number of remaining assets
-            remaining_assets = num_valid_assets % self.num_quantiles
+            # For the last quintile, include the upper bound to catch any rounding issues
+            if quintile == self.num_quantiles - 1:
+                quintile_mask = (all_ranks > lower_bound) & (all_ranks <= upper_bound)
+            else:
+                quintile_mask = (all_ranks > lower_bound) & (all_ranks <= upper_bound)
             
-            # Get the asset ranks for the current date
-            date_ranks = processed_features.iloc[date_idx].rank(method="first")
+            # Count assets in each quintile for each date
+            assets_per_date = quintile_mask.sum(axis=1)
             
-            # Assign assets to quintiles
-            assigned_assets = 0
-            for quintile in range(self.num_quantiles):
-                quintile_name = f"quintile_{quintile+1}"
-                
-                # Calculate the number of constituents for the current quintile
-                if quintile < remaining_assets:
-                    constituents_in_quintile = base_constituents_per_quintile + 1
-                else:
-                    constituents_in_quintile = base_constituents_per_quintile
-                
-                # Identify assets belonging to the current quintile
-                start_rank = assigned_assets + 1
-                end_rank = assigned_assets + constituents_in_quintile
-                quintile_assets = date_ranks[(date_ranks >= start_rank) & (date_ranks <= end_rank)].index
-                
-                # Assign equal weights to assets in the current quintile
-                quintile_weights[quintile_name].loc[date, quintile_assets] = 1 / constituents_in_quintile
-                
-                assigned_assets += constituents_in_quintile
+            # Calculate weights (1/count for each asset in the quintile)
+            for idx in processed_features.index:
+                count = assets_per_date[idx]
+                if count > 0:
+                    quintile_weights[quintile_name].loc[idx, quintile_mask.loc[idx]] = 1 / count
         
         return quintile_weights
 

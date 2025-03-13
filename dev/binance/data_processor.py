@@ -145,6 +145,7 @@ class DataClass():
     TODO:
     - implement the above funcs in the class structure? or not?
     - check if for(normalized) features; larger = better (needs to be consistent for features ofcourse)
+    - assert if weight dims are all the same, i.e., time axis contains same time frames for all pairs
     """
     def __init__(self, pairs: List[str], input_path: str):
         self.pairs = pairs
@@ -170,15 +171,20 @@ class DataClass():
     def summarize_data(self):
         pass
 
-    def normalize_cross_sectional_features(self):
+    def normalize_cross_sectional_features(self, feature_names: List[str] = None):
         """
         Normalizes cross sectional features
         As a result, can easily combine the features via averaging 
         """
+        if feature_names is None:
+            raise ValueError("feature_names must be provided")
         if not self.cross_sectional_feat_dict: #exists ### how can i check this:
-            pass #throw an error
-        else:
-            pass #normalize
+            raise ValueError("cross_sectional_feat_dict does not exist")
+        self.normalized_cross_sectional_feat_dict = {}
+        for feat_name in feature_names:
+            tmp = self.cross_sectional_feat_dict[feat_name]
+            tmp = (tmp.subtract(tmp.mean(axis=1), axis=0)).divide(tmp.std(axis=1), axis=0)
+            self.normalized_cross_sectional_feat_dict[feat_name] = tmp
 
     def create_cross_sectional_feature_matrix_dictionary(self, feat_names: List[str] = None):
         """
