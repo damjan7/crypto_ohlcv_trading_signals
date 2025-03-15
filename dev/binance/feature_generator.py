@@ -100,9 +100,10 @@ class ReturnFeatures(BaseFeature):
     """
     def __init__(self):
         self.periods = {
-            '30m': 1,    # 1 period of 30 minutes
-            '1h': 2,     # 2 periods of 30 minutes
-            '6h': 12,    # 12 periods of 30 minutes
+            '1': 1,     # 1 period
+            '2': 2,     # 2 periods
+            '6': 6,     # 6 periods
+            '12': 12,   # 12 periods
         }
 
     def get_names(self) -> List[str]:
@@ -138,7 +139,7 @@ class VolumeFeatures(BaseFeature):
           is normalized and more comparable across assets with different trading volumes.
     """
     def __init__(self):
-        self.windows = [2, 6, 12, 24, 48]  # windows expressed in 30-minute periods
+        self.windows = [2, 6, 12, 24, 48]  # windows expressed in x num of periods
 
     def get_names(self) -> List[str]:
         return [f'volume_ma_{window}' for window in self.windows] + ['volume_rel_ma24']
