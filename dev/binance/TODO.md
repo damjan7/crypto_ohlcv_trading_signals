@@ -1,5 +1,7 @@
 # Base Trainer Trading System TODOs
 
+## Tree Models to evaluate interactions between variables
+
 ## Create Backtesting Engine
 - Create a backtesting engine that can run on historical data
 - Implement a trading strategy that can be backtested
@@ -13,6 +15,10 @@
 - should take cross sectional data as input (for a number of different asset pairs)
 - signal generator may also output a "probability" or "confidence" score and hence a bet size.
 
+## Analyze Features/Create new Features
+- look at predictive performance of single features on the future returns
+- correlation plots between features
+- correlation plots between features and future returns
 
 ## Model Improvements
 - Add more sophisticated trading metrics like Sortino ratio and Calmar ratio

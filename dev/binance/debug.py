@@ -109,7 +109,7 @@ weights = signal_generator2.generate_signal(feature_dict=data.cross_sectional_fe
 data.cross_sectional_feat_dict["RSI"] #lower better
 data.cross_sectional_feat_dict["stoch_d"] #higher better
 data.cross_sectional_feat_dict["OBV"]
-data.cross_sectional_feat_dict["volume_zscore_20"]
+data.cross_sectional_feat_dict["volume_zscore_20"]# standardized cross sectionally or not?????
 data.cross_sectional_feat_dict["price_rel_ma_2"]
 data.cross_sectional_feat_dict["price_rel_ma_6"]
 #data.cross_sectional_feat_dict["BB_feature"]
@@ -118,7 +118,19 @@ data.normalize_cross_sectional_features(feature_names=["RSI", "stoch_d", "OBV", 
 
 # i.e. high vol, high RSI buy signal, and BB_feature == 1 
 # normalize RSI
+data.normalized_cross_sectional_feat_dict['RSI'] = data.normalized_cross_sectional_feat_dict['RSI'].mul(-1)
+# List of features to aggregate
+feature_names = [
+    'RSI',
+    'stoch_d',
+    'OBV',
+    'price_rel_ma_2',
+    'price_rel_ma_6'
+]
+# Aggregate features by summing them across the specified feature names
+aggregated_features = sum(data.normalized_cross_sectional_feat_dict[feature] for feature in feature_names)
 
+feature_dict = {"aggregated_features": aggregated_features}
 
 
 
@@ -128,8 +140,8 @@ end_date = datetime.datetime(2024, 12, 31)
 signal_generator = sg.SimpleSortingLongOnly(
     config=sg.SignalConfig(window_size=1, step_size=1, min_periods=1, top_n=5, bottom_n=5), 
     signal_name="simple_sorting_signal",
-    feature_name="stoch_d",
-    feature_dict=data.cross_sectional_feat_dict,
+    feature_name="aggregated_features",
+    feature_dict=feature_dict,
     start_date=start_date,
     end_date=end_date,
     num_quantiles=5
