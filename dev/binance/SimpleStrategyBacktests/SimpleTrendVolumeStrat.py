@@ -23,7 +23,7 @@ import helper_functions as hf
 # load data
 TICKER_DATA_PATH = r"data/ticker_specific_data_BINANCE"
 pairs = pd.read_csv("dev/binance/pairs.csv")
-NUM_PAIRS_TO_LOAD = 100
+NUM_PAIRS_TO_LOAD = 200
 pairs = pairs.iloc[:NUM_PAIRS_TO_LOAD, 0].values
 pairs = [pair.replace("USD", "USDT") for pair in pairs]
 pairs = [p for p in pairs if p not in ['USDTT/USDT', 'USDT/USDT', "USDTC/USDT"]]
@@ -55,6 +55,37 @@ print("Finished Cross Sectional Feature Matrix!")
 
 # same for 12 day ma, so might use this factor
 (data.cross_sectional_feat_dict['volume_ma_2'] > 1.5 * data.cross_sectional_feat_dict['volume_ma_12']).sum() / (len(data.cross_sectional_feat_dict['volume_ma_2']) - np.isnan(data.cross_sectional_feat_dict['volume_ma_2']).sum())
+
+##############################################################
+# simple 2 period cross sectional momentum
+two_period_return = data.cross_sectional_feat_dict['return_2']
+demeaned_two_period_return = two_period_return.sub(two_period_return.mean(axis=1), axis=0)
+zscore_two_period_return = demeaned_two_period_return.div(demeaned_two_period_return.std(axis=1), axis=0)
+data.cross_sectional_feat_dict['zscore_return_2'] = zscore_two_period_return
+
+start_date = datetime.datetime(2022, 1, 1)
+end_date = datetime.datetime(2024, 12, 31)
+signal_generator = sg.SimpleSortingLongOnly(
+    config=sg.SignalConfig(window_size=1, step_size=1, min_periods=1, top_n=5, bottom_n=5), 
+    signal_name="simple_sorting_signal_return2",
+    feature_name="zscore_return_2",
+    feature_dict=data.cross_sectional_feat_dict,
+    start_date=start_date,
+    end_date=end_date,
+    num_quantiles=5
+    )
+print("Calculating Weights...")
+weights = signal_generator.generate_signal()
+print("Finished Calculating Weights!")
+
+backtester = Backtester(data_dict=data.cross_sectional_feat_dict, weights=weights['quintile_5'], start_date=start_date, end_date=end_date)
+out = backtester.run_backtest()
+metrics = backtester.performance_metrics()
+print(metrics)
+backtester.plot_results()
+##############################################################
+
+
 
 
 # now for the trend signal
@@ -293,10 +324,9 @@ for col in vol_cols:
 fig2 = px.line(xrp_norm2, vol_cols, title="Z-Score Normalized Volume MAs (XRP/USDT)")
 fig2.show()
 
-
 #  
 
-
+prin
 
 
 
