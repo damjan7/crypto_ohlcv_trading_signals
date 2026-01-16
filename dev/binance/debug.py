@@ -114,6 +114,17 @@ data.cross_sectional_feat_dict["price_rel_ma_2"]
 data.cross_sectional_feat_dict["price_rel_ma_6"]
 #data.cross_sectional_feat_dict["BB_feature"]
 
+# check survivorship bias in data; i.e., if there exist coins that stop being in the dataset
+def check_survivorship_bias():
+    pairs = data.feature_dict.keys()
+    out = {}
+    for p in pairs:
+        if data.feature_dict[p].shape[0] <  data.feature_dict['BTC/USDT'].shape[0]:
+            if data.feature_dict[p].index[-1] != data.feature_dict['BTC/USDT'].index[-1]:
+                out[p] = (data.feature_dict[p].index[0], data.feature_dict[p].index[-1])
+    return out
+
+
 data.normalize_cross_sectional_features(feature_names=["RSI", "stoch_d", "OBV", "price_rel_ma_2", "price_rel_ma_6"])    
 
 # i.e. high vol, high RSI buy signal, and BB_feature == 1 
