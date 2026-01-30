@@ -16,8 +16,8 @@ def main():
     
     # 1. Configuration
     # Use real dates?
-    START_DATE = datetime.datetime(2023, 1, 1)
-    END_DATE = datetime.datetime(2023, 12, 31)
+    START_DATE = None
+    END_DATE = None 
     INTERVAL = "1d"
     DOWNLOAD = True # Set to True to verify donwload if package installed
     
@@ -25,12 +25,12 @@ def main():
     print("Initializing Data Pipeline...")
     # resolved path: .../dev/binance_trading/data_storage
     data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data_storage")
-    pipeline = DataPipeline(data_dir=data_dir)
+    pipeline = DataPipeline(data_dir=data_dir) 
     
     print("Loading/Processing All Available Data...")
     processed_data = pipeline.load_and_process(
         pairs=None, # binance_historical_data Loads all USDT pairs in that case
-        start_date=START_DATE,
+        start_date=START_DATE, 
         end_date=END_DATE,
         interval=INTERVAL,
         update_data=DOWNLOAD # TRUE = DOWNLOAD/UPDATE (ALL) DATA
