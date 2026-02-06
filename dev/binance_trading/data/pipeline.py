@@ -2,11 +2,13 @@ import pandas as pd
 from typing import List, Dict, Tuple
 import datetime
 from data.loader import BinanceLoader
+from data.downloader import BinanceDownloader
 from features.indicators import FeatureGenerator
 
 class DataPipeline:
     def __init__(self, data_dir: str = "data_storage"):
         self.loader = BinanceLoader(data_dir=data_dir)
+        self.downloader = BinanceDownloader(data_dir=data_dir)
         self.feature_generator = FeatureGenerator()
 
     def load_and_process(self, 
@@ -20,7 +22,7 @@ class DataPipeline:
         print(f"Processing for interval {interval}..")
 
         if update_data:
-            self.loader.update_all_data(
+            self.downloader.update_all_data(
                 start_date=start_date,
                 end_date=end_date,
                 interval=interval
