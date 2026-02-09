@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from datetime import date, timedelta
 import glob
+import json
 
 def process_six_data():
     # Configuration
@@ -137,6 +138,22 @@ def process_six_data():
             print(f"  - {f}")
     else:
         print("\nNo missing weekday files found.")
+
+    # Check download log for historical holes
+    log_file = "download_log.json"
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, 'r') as f:
+                log_data = json.load(f)
+                missing_dates_log = log_data.get("missing_dates", [])
+                if missing_dates_log:
+                    print("\nKNOWN DATA HOLES (from download log):")
+                    for d in missing_dates_log:
+                        print(f"  - {d}")
+                else:
+                    print("\nNo known data holes in download log.")
+        except Exception as e:
+            print(f"Error reading download log: {e}")
         
     print("\nCROSS-SECTIONAL DATAFRAME STATS:")
     report_df = pd.DataFrame(validation_report)
